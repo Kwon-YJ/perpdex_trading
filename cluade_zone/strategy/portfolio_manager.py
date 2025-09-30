@@ -6,8 +6,10 @@ import asyncio
 
 import sys
 sys.path.append('/home/kyj1435/project/perpdex_trading/cluade_zone/exchanges')
+sys.path.append('/home/kyj1435/project/perpdex_trading/cluade_zone/strategy')
 
 from base import ExchangeClient, Asset, Order, OrderSide, OrderType, Position
+from correlation import CorrelationCalculator
 
 
 @dataclass
@@ -22,9 +24,11 @@ class PortfolioBasket:
 class PortfolioManager:
     """델타 중립 포트폴리오 매니저"""
 
-    def __init__(self, clients: List[ExchangeClient]):
+    def __init__(self, clients: List[ExchangeClient], use_correlation: bool = True):
         self.clients = clients
         self.clients_map = {c.name: c for c in clients}
+        self.use_correlation = use_correlation
+        self.correlation_calculator = CorrelationCalculator(clients) if use_correlation else None
 
     async def create_delta_neutral_portfolio(
         self,
@@ -52,19 +56,34 @@ class PortfolioManager:
         print(f"롱 거래소: {long_exchanges}")
         print(f"숏 거래소: {short_exchanges}")
 
-        # 2. 각 거래소에서 거래 가능한 자산 조회
+        # 2. 상관계수 기반 자산 선택 (또는 랜덤)
+        if self.use_correlation and self.correlation_calculator:
+            print("상관계수 기반 자산 선택 중...")
+            long_assets_map, short_assets_map = await self.correlation_calculator.select_best_correlated_assets(
+                long_exchanges,
+                short_exchanges,
+                target_assets_per_exchange=assets_per_exchange
+            )
+        else:
+            print("랜덤 자산 선택 중...")
+            long_assets_map = None
+            short_assets_map = None
+
+        # 3. 각 거래소에서 거래 가능한 자산 조회 및 주문 생성
         long_orders = await self._create_basket_orders(
             long_exchanges,
             OrderSide.LONG,
             total_capital_per_side,
-            assets_per_exchange
+            assets_per_exchange,
+            preselected_assets=long_assets_map
         )
 
         short_orders = await self._create_basket_orders(
             short_exchanges,
             OrderSide.SHORT,
             total_capital_per_side,
-            assets_per_exchange
+            assets_per_exchange,
+            preselected_assets=short_assets_map
         )
 
         # 3. 델타 계산 및 균형 맞추기
@@ -104,35 +123,45 @@ class PortfolioManager:
         exchanges: List[str],
         side: OrderSide,
         total_capital: float,
-        assets_per_exchange: int
+        assets_per_exchange: int,
+        preselected_assets: Dict[str, List[Asset]] = None
     ) -> List[Order]:
         """바스켓 주문 생성"""
         orders = []
-        capital_per_exchange = total_capital / len(exchanges)
+        capital_per_exchange = total_capital / len(exchanges) if exchanges else 0
 
         for exchange_name in exchanges:
             client = self.clients_map[exchange_name]
 
-            # 거래 가능한 자산 조회
-            try:
-                available_assets = await client.get_available_assets()
-            except Exception as e:
-                print(f"{exchange_name} 자산 조회 실패: {e}")
-                continue
+            # 사전 선택된 자산이 있으면 사용, 없으면 랜덤 선택
+            if preselected_assets and exchange_name in preselected_assets:
+                selected_assets = preselected_assets[exchange_name]
+                print(f"{exchange_name}: 상관계수 기반 {len(selected_assets)}개 자산 선택됨")
+            else:
+                # 거래 가능한 자산 조회
+                try:
+                    available_assets = await client.get_available_assets()
+                except Exception as e:
+                    print(f"{exchange_name} 자산 조회 실패: {e}")
+                    continue
 
-            if not available_assets:
-                print(f"{exchange_name}에 거래 가능한 자산이 없습니다")
-                continue
+                if not available_assets:
+                    print(f"{exchange_name}에 거래 가능한 자산이 없습니다")
+                    continue
 
-            # 랜덤으로 3~5개 자산 선택
-            num_assets = min(
-                random.randint(3, 5),
-                len(available_assets),
-                assets_per_exchange
-            )
-            selected_assets = random.sample(available_assets, num_assets)
+                # 랜덤으로 3~5개 자산 선택
+                num_assets = min(
+                    random.randint(3, 5),
+                    len(available_assets),
+                    assets_per_exchange
+                )
+                selected_assets = random.sample(available_assets, num_assets)
+                print(f"{exchange_name}: 랜덤 {len(selected_assets)}개 자산 선택됨")
 
             # 각 자산에 균등 배분
+            num_assets = len(selected_assets)
+            if num_assets == 0:
+                continue
             capital_per_asset = capital_per_exchange / num_assets
 
             for asset in selected_assets:

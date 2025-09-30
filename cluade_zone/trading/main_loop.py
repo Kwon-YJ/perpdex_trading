@@ -8,9 +8,11 @@ import sys
 
 sys.path.append('/home/kyj1435/project/perpdex_trading/cluade_zone/exchanges')
 sys.path.append('/home/kyj1435/project/perpdex_trading/cluade_zone/strategy')
+sys.path.append('/home/kyj1435/project/perpdex_trading/cluade_zone/utils')
 
 from base import ExchangeClient
 from portfolio_manager import PortfolioManager
+from exchange_guide_updater import ExchangeGuideUpdater
 
 
 class TradingBot:
@@ -20,15 +22,17 @@ class TradingBot:
         self,
         clients: List[ExchangeClient],
         profit_target: float = 1.0,  # 1원 이상 순이익
-        wait_time: int = 600  # 10분 (초)
+        wait_time: int = 600,  # 10분 (초)
+        use_correlation: bool = True
     ):
         self.clients = clients
-        self.portfolio_manager = PortfolioManager(clients)
+        self.portfolio_manager = PortfolioManager(clients, use_correlation=use_correlation)
         self.profit_target = profit_target
         self.wait_time = wait_time
 
         self.log_file = "/home/kyj1435/project/perpdex_trading/cluade_zone/trading_result.txt"
         self.exchange_guide_file = "/home/kyj1435/project/perpdex_trading/cluade_zone/exchange_guide.txt"
+        self.exchange_guide_updater = ExchangeGuideUpdater(self.exchange_guide_file)
 
     def log(self, message: str):
         """로그 출력 및 파일 저장"""
@@ -137,13 +141,24 @@ class TradingBot:
     async def update_exchange_guide(self):
         """exchange_guide.txt의 현재자본 업데이트"""
         try:
-            for client in self.clients:
-                balance = await client.get_balance()
-                self.log(f"{client.name} 현재 자본: {balance.total} {balance.asset}")
+            capital_map = {}
 
-                # exchange_guide.txt 업데이트
-                # TODO: CSV 파일 파싱 및 업데이트 구현
-                # 현재는 로그만 출력
+            for client in self.clients:
+                try:
+                    balance = await client.get_balance()
+                    self.log(f"{client.name} 현재 자본: {balance.total} {balance.asset}")
+                    capital_map[client.name] = balance.total
+                except Exception as e:
+                    self.log(f"{client.name} 잔고 조회 실패: {e}")
+
+            # exchange_guide.txt 업데이트
+            if capital_map:
+                results = self.exchange_guide_updater.update_multiple_capitals(capital_map)
+                for exchange, success in results.items():
+                    if success:
+                        self.log(f"✓ {exchange} exchange_guide.txt 업데이트 완료")
+                    else:
+                        self.log(f"✗ {exchange} exchange_guide.txt 업데이트 실패")
 
         except Exception as e:
             self.log(f"자본 업데이트 실패: {e}")
