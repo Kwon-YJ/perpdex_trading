@@ -102,6 +102,8 @@ class TradingBot:
 
             if total_positions == 0:
                 self.log("⚠️ 포지션 진입에 실패하여 사이클을 종료합니다")
+                self.log(f"10분 대기 후 재시도합니다")
+                await asyncio.sleep(self.wait_time)
                 return
 
             # 3. 10분 대기

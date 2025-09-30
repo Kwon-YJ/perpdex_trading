@@ -93,7 +93,8 @@ class BackpackClient(ExchangeClient):
     async def initialize(self) -> bool:
         """클라이언트 초기화"""
         if aiohttp is None:
-            raise ImportError("aiohttp가 설치되지 않았습니다")
+            print("✗ aiohttp가 설치되지 않았습니다")
+            return False
 
         self.session = aiohttp.ClientSession()
 
