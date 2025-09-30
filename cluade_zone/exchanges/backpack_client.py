@@ -1,8 +1,6 @@
 """Backpack Exchange REST API 클라이언트"""
 import asyncio
 import time
-import hmac
-import hashlib
 import base64
 from typing import Dict, List, Optional, Tuple
 import json
@@ -11,6 +9,11 @@ try:
     import aiohttp
 except ImportError:
     aiohttp = None
+
+try:
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+except ImportError:
+    ed25519 = None
 
 from base import (
     ExchangeClient, Asset, Balance, Order, OrderResult,
@@ -23,16 +26,35 @@ class BackpackClient(ExchangeClient):
 
     BASE_URL = "https://api.backpack.exchange"
 
+    # 엔드포인트별 instruction 매핑
+    INSTRUCTION_MAP = {
+        "/api/v1/capital": "balanceQuery",
+        "/api/v1/account": "accountQuery",
+        "/api/v1/order": "orderExecute",
+        "/api/v1/orders": "orderQueryAll",
+        "/api/v1/order/cancel": "orderCancel",
+        "/api/v1/order/cancelAll": "orderCancelAll",
+        "/api/v1/positions": "borrowLendPositionQuery",
+    }
+
     def __init__(self, api_key: str, secret_key: str):
         super().__init__("Backpack")
         # Base64 인코딩된 ED25519 키
         self.api_key = api_key
         self.secret_key = secret_key
+
+        # ED25519 private key 생성
+        if ed25519 is None:
+            raise ImportError("cryptography 라이브러리가 필요합니다")
+        secret_bytes = base64.b64decode(secret_key)
+        self.private_key = ed25519.Ed25519PrivateKey.from_private_bytes(secret_bytes)
+
         self.session: Optional[aiohttp.ClientSession] = None
 
     def _generate_signature(
         self,
-        instruction: str,
+        method: str,
+        endpoint: str,
         params: Optional[Dict] = None
     ) -> Tuple[str, str, str]:
         """
@@ -42,22 +64,22 @@ class BackpackClient(ExchangeClient):
         timestamp = str(int(time.time() * 1000))
         window = "5000"  # 5초
 
+        # instruction 찾기 (엔드포인트 매핑 사용)
+        instruction = self.INSTRUCTION_MAP.get(endpoint)
+        if not instruction:
+            # 매핑에 없으면 기본값으로 엔드포인트 마지막 부분 사용
+            instruction = endpoint.split('/')[-1]
+
         # 서명 페이로드 생성
-        if params:
+        if params and method == "GET":
             param_str = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
             sign_str = f"instruction={instruction}&{param_str}&timestamp={timestamp}&window={window}"
         else:
             sign_str = f"instruction={instruction}&timestamp={timestamp}&window={window}"
 
-        # ED25519 서명 (Base64 디코딩된 비밀키 사용)
-        secret_bytes = base64.b64decode(self.secret_key)
-        signature = base64.b64encode(
-            hmac.new(
-                secret_bytes,
-                sign_str.encode('utf-8'),
-                hashlib.sha256
-            ).digest()
-        ).decode('utf-8')
+        # ED25519 서명
+        signature_bytes = self.private_key.sign(sign_str.encode('utf-8'))
+        signature = base64.b64encode(signature_bytes).decode('utf-8')
 
         return signature, timestamp, window
 
@@ -91,9 +113,8 @@ class BackpackClient(ExchangeClient):
         headers = {}
 
         if signed:
-            instruction = endpoint.split('/')[-1]
             signature, timestamp, window = self._generate_signature(
-                instruction, params
+                method, endpoint, params
             )
             headers.update({
                 "X-API-Key": self.api_key,
