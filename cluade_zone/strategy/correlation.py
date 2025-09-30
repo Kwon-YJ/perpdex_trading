@@ -1,6 +1,6 @@
 """상관계수 계산 모듈"""
 import asyncio
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Callable
 from dataclasses import dataclass
 import time
 
@@ -32,9 +32,22 @@ class AssetPair:
 class CorrelationCalculator:
     """상관계수 계산기"""
 
-    def __init__(self, clients: List[ExchangeClient]):
+    def __init__(
+        self,
+        clients: List[ExchangeClient],
+        logger: Optional[Callable[[str], None]] = None
+    ):
         self.clients = clients
         self.clients_map = {c.name: c for c in clients}
+        self.logger = logger
+
+    def _log(self, message: str):
+        """로깅 헬퍼"""
+        if self.logger:
+            self.logger(message)
+        else:
+            # 기본 출력은 사용자 지침에 따라 최소화
+            pass
 
     async def fetch_price_history(
         self,
@@ -62,7 +75,7 @@ class CorrelationCalculator:
                 if i < samples - 1:  # 마지막 샘플이 아니면 대기
                     await asyncio.sleep(interval)
             except Exception as e:
-                print(f"가격 조회 실패 {symbol}@{exchange_name}: {e}")
+                self._log(f"{exchange_name}의 {symbol} 가격 조회 중 오류 발생: {e}")
                 continue
 
         if len(prices) < 2:
@@ -133,12 +146,14 @@ class CorrelationCalculator:
         self,
         long_assets: List[Tuple[Asset, str]],  # (asset, exchange)
         short_assets: List[Tuple[Asset, str]],
-        min_correlation: float = 0.7,
+        min_correlation: float = 0.9,
         sample_duration: int = 60,  # 1분만 샘플링
         sample_interval: int = 5  # 5초마다
     ) -> List[AssetPair]:
         """빠른 상관관계 페어 찾기 (단축 버전)"""
-        print(f"상관관계 분석 시작 (샘플링: {sample_duration}초, 간격: {sample_interval}초)")
+        self._log(
+            f"상관관계 분석 시작 (샘플링 {sample_duration}초, 간격 {sample_interval}초, 임계값 {min_correlation:.2f})"
+        )
 
         # 롱 자산들의 가격 히스토리 수집
         long_price_data = []
@@ -178,7 +193,9 @@ class CorrelationCalculator:
                         short_exchange=short_ex,
                         correlation=correlation
                     ))
-                    print(f"높은 상관관계 발견: {long_asset.symbol}@{long_ex} <-> {short_asset.symbol}@{short_ex} (r={correlation:.3f})")
+                    self._log(
+                        f"높은 상관관계 식별: {long_asset.symbol}@{long_ex} ↔ {short_asset.symbol}@{short_ex} (r={correlation:.3f})"
+                    )
 
         # 상관계수가 높은 순으로 정렬
         pairs.sort(key=lambda p: abs(p.correlation), reverse=True)
@@ -232,7 +249,7 @@ class CorrelationCalculator:
         )
 
         if not correlated_pairs:
-            print("⚠️  높은 상관관계 페어를 찾지 못했습니다. 랜덤 선택으로 대체합니다.")
+            self._log("⚠️ 높은 상관관계 페어를 찾지 못해 무작위 선택으로 대체합니다")
             # 폴백: 랜덤 선택
             return await self._fallback_random_selection(
                 long_exchanges,
@@ -287,7 +304,7 @@ class CorrelationCalculator:
                 selected = random.sample(assets, min(target_assets_per_exchange, len(assets)))
                 long_assets_by_exchange[exchange] = selected
             except Exception as e:
-                print(f"{exchange} 자산 조회 실패: {e}")
+                self._log(f"{exchange} 거래소 자산 조회 실패: {e}")
                 long_assets_by_exchange[exchange] = []
 
         short_assets_by_exchange = {}
@@ -301,7 +318,7 @@ class CorrelationCalculator:
                 selected = random.sample(assets, min(target_assets_per_exchange, len(assets)))
                 short_assets_by_exchange[exchange] = selected
             except Exception as e:
-                print(f"{exchange} 자산 조회 실패: {e}")
+                self._log(f"{exchange} 거래소 자산 조회 실패: {e}")
                 short_assets_by_exchange[exchange] = []
 
         return long_assets_by_exchange, short_assets_by_exchange
