@@ -40,6 +40,7 @@ async def main():
     bot = TradingBot(
         clients=clients,
         profit_target=0.01,  # $0.01 이상 순이익 (매우 낮은 목표)
+        capital_per_side=200.0,  # 한쪽당 $200 (메이저 자산 최소 주문 크기 충족)
         wait_time=600,  # 10분 (초)
         use_correlation=False  # 상관계수 사용 안 함 (단일 거래소)
     )

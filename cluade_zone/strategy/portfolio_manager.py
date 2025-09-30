@@ -47,14 +47,20 @@ class PortfolioManager:
         """
         # 1. 거래소를 랜덤으로 롱/숏 그룹으로 분할
         exchanges = list(self.clients_map.keys())
-        random.shuffle(exchanges)
-        mid = len(exchanges) // 2
 
-        long_exchanges = exchanges[:mid]
-        short_exchanges = exchanges[mid:]
-
-        print(f"롱 거래소: {long_exchanges}")
-        print(f"숏 거래소: {short_exchanges}")
+        # 특별 케이스: 단일 거래소인 경우 롱/숏 모두 같은 거래소 사용
+        if len(exchanges) == 1:
+            long_exchanges = exchanges
+            short_exchanges = exchanges
+            print(f"⚠️  단일 거래소 모드: {exchanges[0]}")
+            print(f"   롱/숏 포지션을 같은 거래소에서 거래합니다")
+        else:
+            random.shuffle(exchanges)
+            mid = len(exchanges) // 2
+            long_exchanges = exchanges[:mid]
+            short_exchanges = exchanges[mid:]
+            print(f"롱 거래소: {long_exchanges}")
+            print(f"숏 거래소: {short_exchanges}")
 
         # 2. 상관계수 기반 자산 선택 (또는 랜덤)
         if self.use_correlation and self.correlation_calculator:
@@ -130,10 +136,17 @@ class PortfolioManager:
         orders = []
         capital_per_exchange = total_capital / len(exchanges) if exchanges else 0
 
+        # 화이트리스트: 검증된 메이저 심볼만 사용
+        WHITELISTED_SYMBOLS = [
+            'SOL_USDC_PERP',
+            'BTC_USDC_PERP',
+            'ETH_USDC_PERP'
+        ]
+
         for exchange_name in exchanges:
             client = self.clients_map[exchange_name]
 
-            # 사전 선택된 자산이 있으면 사용, 없으면 랜덤 선택
+            # 사전 선택된 자산이 있으면 사용, 없으면 화이트리스트 기반 선택
             if preselected_assets and exchange_name in preselected_assets:
                 selected_assets = preselected_assets[exchange_name]
                 print(f"{exchange_name}: 상관계수 기반 {len(selected_assets)}개 자산 선택됨")
@@ -149,14 +162,24 @@ class PortfolioManager:
                     print(f"{exchange_name}에 거래 가능한 자산이 없습니다")
                     continue
 
-                # 랜덤으로 3~5개 자산 선택
+                # 화이트리스트에서 사용 가능한 자산만 필터링
+                whitelisted_assets = [
+                    asset for asset in available_assets
+                    if asset.symbol in WHITELISTED_SYMBOLS
+                ]
+
+                if not whitelisted_assets:
+                    print(f"{exchange_name}에 화이트리스트 자산이 없습니다")
+                    continue
+
+                # 화이트리스트에서 랜덤으로 3~5개 자산 선택 (최대 가능한 만큼)
                 num_assets = min(
                     random.randint(3, 5),
-                    len(available_assets),
+                    len(whitelisted_assets),
                     assets_per_exchange
                 )
-                selected_assets = random.sample(available_assets, num_assets)
-                print(f"{exchange_name}: 랜덤 {len(selected_assets)}개 자산 선택됨")
+                selected_assets = random.sample(whitelisted_assets, num_assets)
+                print(f"{exchange_name}: 화이트리스트에서 {len(selected_assets)}개 자산 선택됨 {[a.symbol for a in selected_assets]}")
 
             # 각 자산에 균등 배분
             num_assets = len(selected_assets)
@@ -175,12 +198,20 @@ class PortfolioManager:
                     # Backpack은 decimal precision이 엄격하므로 최대 2자리로 제한
                     safe_precision = min(asset.size_precision, 2)
 
+                    # 최소 주문 크기 체크 - 여유를 두고 2배로 설정
+                    min_required = asset.min_size * 2.0
+
+                    # 최소 크기 미달 시 최소 크기의 2배로 설정
+                    if size < min_required:
+                        print(f"{asset.symbol} 주문 크기 조정: {size:.6f} -> {min_required:.6f}")
+                        size = min_required
+
                     # 정밀도에 맞춰 반올림
                     size = round(size, safe_precision)
 
-                    # 최소 주문 크기 체크
+                    # 다시 최소 크기 체크 (반올림 후)
                     if size < asset.min_size:
-                        print(f"{asset.symbol} 주문 크기가 너무 작음: {size} < {asset.min_size}")
+                        print(f"{asset.symbol} 주문 크기가 여전히 작음: {size} < {asset.min_size}, 스킵")
                         continue
 
                     orders.append(Order(

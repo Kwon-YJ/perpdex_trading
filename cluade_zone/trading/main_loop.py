@@ -22,12 +22,14 @@ class TradingBot:
         self,
         clients: List[ExchangeClient],
         profit_target: float = 1.0,  # 1원 이상 순이익
+        capital_per_side: float = 100.0,  # 한쪽당 자본
         wait_time: int = 600,  # 10분 (초)
         use_correlation: bool = True
     ):
         self.clients = clients
         self.portfolio_manager = PortfolioManager(clients, use_correlation=use_correlation)
         self.profit_target = profit_target
+        self.capital_per_side = capital_per_side
         self.wait_time = wait_time
 
         self.log_file = "/home/kyj1435/project/perpdex_trading/cluade_zone/trading_result.txt"
@@ -58,8 +60,8 @@ class TradingBot:
             # 1. 델타 중립 포트폴리오 생성
             self.log("1단계: 델타 중립 포트폴리오 생성")
             long_basket, short_basket = await self.portfolio_manager.create_delta_neutral_portfolio(
-                total_capital_per_side=50.0,  # 한 쪽당 $50 (테스트용 소액)
-                assets_per_exchange=2  # 자산 수 줄임 (2개)
+                total_capital_per_side=self.capital_per_side,
+                assets_per_exchange=3  # 화이트리스트에 3개 있음
             )
 
             self.log(f"롱 바스켓: {len(long_basket.orders)}개 주문, 목표 델타: ${long_basket.target_delta:.2f}")
