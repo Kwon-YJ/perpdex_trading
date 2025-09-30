@@ -1,0 +1,5 @@
+- 트레이딩 메인 루프(`cluade_zone/trading/main_loop.py`)가 요구 사항에 맞춰 사이클을 구성하며, 10분 대기·손익 목표·강제 청산 처리·현금화·exchange_guide.txt 업데이트까지 모두 포함함을 확인했습니다.
+- 포트폴리오 매니저(`cluade_zone/strategy/portfolio_manager.py`)는 거래소 절반을 무작위로 롱/숏으로 나누고, 거래소당 3~5개 자산을 선택해 델타 기준으로 균형을 맞추도록 설계되어 있습니다.
+- 상관계수 계산기(`cluade_zone/strategy/correlation.py`)가 롱/숏 후보 자산 가격을 샘플링한 뒤 높은 상관 페어를 골라내는 구조임을 점검했습니다.
+- 로그는 `./cluade_zone/trading_result.txt`와 UTC 타임스탬프 세션 파일에 기록되며, 결과를 콘솔로 출력하지 않는 형태였습니다.
+- `/project/arbitrage_bot/.venv/bin/activate` 경로는 존재하지 않아 안내된 명령으로는 가상환경을 활성화할 수 없었고, `.venv` 환경에는 `pytest`가 설치되지 않아 테스트 실행은 보류되었습니다.
