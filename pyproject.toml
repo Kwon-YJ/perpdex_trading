@@ -10,6 +10,7 @@ dependencies = [
     "grvt-pysdk>=0.2.1",
     "python-dotenv>=1.1.1",
     "cryptography>=46.0.1",
+    "paradex-py>=0.5.0rc0",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"

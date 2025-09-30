@@ -1,0 +1,252 @@
+============================================================
+Paradex 거래소 구현 및 테스트 보고서
+============================================================
+작성 일시: 2025-09-30 13:40 UTC
+작성자: AI Trading Bot Assistant
+
+## 1. 개요
+
+Paradex는 Starknet 기반의 탈중앙화 영구선물 거래소(DEX)입니다.
+이번 구현에서는 REST API를 직접 사용하는 클라이언트를 작성했으나,
+Paradex의 특수한 인증 및 온보딩 프로세스로 인해 제한적인 기능만 구현되었습니다.
+
+## 2. Paradex 특징
+
+### 2.1 기술 스택
+- **Layer 2**: Starknet (Paraclear Mainnet)
+- **L1 체인**: Ethereum Mainnet
+- **결제 자산**: USDC (L2 브릿지 토큰)
+- **온체인 결제**: Starknet 스마트 컨트랙트
+
+### 2.2 인증 요구사항
+1. **L1 Ethereum 주소**: 0x...
+2. **L2 Starknet 계정**: Paraclear에 배포된 계정
+3. **온보딩 프로세스**:
+   - L1에서 서명
+   - L2 계정 생성 및 배포
+   - JWT 토큰 발급
+4. **SDK 의존성**: eth-account 버전 충돌로 paradex-py SDK 설치 불가
+   - grvt-pysdk: eth-account>=0.13.4 요구
+   - paradex-py: eth-account>=0.11.0,<0.12.0 요구
+   - 해결 불가능한 의존성 충돌
+
+## 3. 구현 내용
+
+### 3.1 구현된 클라이언트 (paradex_client.py)
+
+#### 구현된 메서드
+- ✅ `initialize()`: 공개 API 연결 테스트
+- ✅ `get_available_assets()`: 거래 가능한 마켓 목록 조회
+- ⚠️ `get_balance()`: NotImplementedError (인증 필요)
+- ⚠️ `get_current_price()`: 401 Unauthorized (인증 필요)
+- ⚠️ `place_order()`: 미구현 (Starknet 서명 필요)
+- ⚠️ `get_positions()`: 미구현 (인증 필요)
+- ⚠️ `close_position()`: 미구현 (인증 필요)
+
+#### 작동하는 기능
+```python
+# 공개 API - 마켓 목록 조회
+assets = await client.get_available_assets()
+# 결과: ETH-USD-PERP, BTC-USD-PERP 등
+```
+
+#### 작동하지 않는 기능 (인증 필요)
+- 잔고 조회
+- 특정 마켓 가격 조회
+- 주문 실행
+- 포지션 관리
+
+### 3.2 인증 구현 시도
+
+```python
+async def _get_jwt_token(self) -> str:
+    # 시도한 방법:
+    # 1. L1 Ethereum 서명
+    message = f"Sign in to Paradex\n\nTimestamp: {timestamp}"
+    signed_message = self.account.sign_message(message_hash)
+
+    # 2. JWT 요청
+    # POST /v1/auth
+    # 결과: 400 Bad Request
+    # 원인: L2 계정 온보딩이 선행되어야 함
+```
+
+## 4. 테스트 결과
+
+### 4.1 테스트 실행
+```
+[1] 초기화
+   ✓ 공개 API 연결 성공
+   ⚠️ 거래 기능은 Starknet 온보딩 및 SDK 필요
+
+[2] 잔고 조회
+   ⚠️ 스킵: JWT 인증 필요
+
+[3] 마켓 목록
+   ✓ 거래 심볼 확인: ETH-USD-PERP
+
+[4] 가격 조회
+   ✗ 401 Unauthorized (인증 필요)
+
+[5] 거래 실행
+   ⚠️ 스킵: Starknet 온보딩 필요
+```
+
+### 4.2 테스트 결과 요약
+- **상태**: 부분 성공
+- **작동**: 공개 API (마켓 목록)
+- **미작동**: 인증이 필요한 모든 기능
+- **에러**: 401 Unauthorized, NotImplementedError
+
+## 5. 문제점 및 제약사항
+
+### 5.1 SDK 의존성 충돌
+```
+grvt-pysdk==0.2.1 requires eth-account>=0.13.4
+paradex-py==0.4.9 requires eth-account>=0.11.0,<0.12.0
+→ 동시 설치 불가능
+```
+
+**해결 방안**:
+1. 별도 가상환경 사용
+2. grvt-pysdk 제거 후 paradex-py 설치
+3. Docker 컨테이너로 격리
+
+### 5.2 복잡한 온보딩 프로세스
+
+Paradex 사용을 위해 필요한 단계:
+1. ✅ L1 Ethereum 주소 보유
+2. ❌ Starknet 계정 생성
+3. ❌ Paraclear에 계정 배포
+4. ❌ USDC L1→L2 브릿징
+5. ❌ JWT 토큰 발급
+6. ❌ 주문 서명 (Starknet 서명)
+
+**현재 상태**: 1단계만 완료
+
+### 5.3 REST API 제약
+
+Paradex REST API는 다음을 요구:
+- **인증**: JWT 토큰 (모든 프라이빗 엔드포인트)
+- **주문 서명**: Starknet 키로 서명
+- **계정 상태**: 온체인 계정 배포 완료
+
+## 6. 권장 구현 방법
+
+### 6.1 단기 해결책: SDK 사용
+
+```bash
+# 별도 환경에서 paradex-py 설치
+pip install paradex-py
+
+# 사용 예시
+from paradex_py import Paradex
+from paradex_py.environment import Environment
+
+paradex = Paradex(
+    env=Environment.PROD,
+    l1_address="0x...",
+    l1_private_key="0x..."
+)
+
+# 온보딩
+await paradex.onboard()
+
+# 주문
+await paradex.create_order(
+    market="ETH-USD-PERP",
+    side="BUY",
+    type="MARKET",
+    size=0.001
+)
+```
+
+### 6.2 장기 해결책: 통합 클라이언트
+
+```python
+class UnifiedExchangeClient:
+    def __init__(self):
+        # 거래소별 별도 환경
+        self.backpack = BackpackClient(...)  # eth-account 0.13+
+        self.paradex = ParadexSDKWrapper(...)  # eth-account 0.11
+
+    async def place_order(self, exchange, order):
+        if exchange == "Backpack":
+            return await self.backpack.place_order(order)
+        elif exchange == "Paradex":
+            return await self.paradex.place_order(order)
+```
+
+## 7. 대안 거래소 추천
+
+Paradex의 복잡성을 고려할 때, 다음 거래소를 우선 구현 권장:
+
+### 7.1 우선순위 높음
+1. **Backpack** ✅ (구현 완료)
+   - REST API 간단
+   - ED25519 서명만 필요
+   - 테스트 성공
+
+2. **Hibachi**
+   - Python SDK 제공
+   - API 키 기반 인증
+   - REST API 직접 사용 가능
+
+3. **TanX**
+   - Python SDK 지원
+   - API 키 발급 간단
+
+### 7.2 우선순위 중간
+4. **Extended**
+   - Starknet 기반이지만 API 간단
+   - API 키 인증
+
+5. **Aster**
+   - REST API
+   - API 키 인증
+
+### 7.3 우선순위 낮음 (복잡함)
+- **Paradex** (Starknet 온보딩 필요)
+- **Reya** (Wallet key 사용)
+- **Ostium Labs** (RPC 필요)
+
+## 8. 결론
+
+### 8.1 구현 상태
+- ✅ 클라이언트 코드 작성 완료
+- ✅ 공개 API 연결 성공
+- ⚠️ 인증 기능 미완성
+- ❌ 거래 기능 미구현
+
+### 8.2 실용성 평가
+**현재 구현으로는 프로덕션 사용 불가**
+
+이유:
+1. SDK 의존성 충돌
+2. Starknet 온보딩 미완료
+3. 거래 기능 미작동
+
+### 8.3 다음 단계
+
+**권장 사항**:
+1. Paradex 구현을 보류하고 다른 거래소 우선 구현
+2. Hibachi, TanX, Extended 등 간단한 거래소부터 완성
+3. 5-6개 거래소 안정화 후 Paradex 재시도
+4. 또는 별도 마이크로서비스로 Paradex 전용 환경 구성
+
+**Paradex 재구현 시 필요 사항**:
+1. 별도 Python 환경 (eth-account 0.11)
+2. paradex-py SDK 설치
+3. Starknet 온보딩 스크립트
+4. L2 계정 관리 로직
+
+## 9. 구현 파일 위치
+
+- 클라이언트: `/cluade_zone/exchanges/paradex_client.py`
+- 테스트 스크립트: `/cluade_zone/test_paradex_trade.py`
+- 테스트 결과: `/cluade_zone/20250930_133835_paradex_test_result.txt`
+- 보고서: `/cluade_zone/20250930_134000_paradex_report.txt`
+
+============================================================
+보고서 작성 완료
+============================================================
