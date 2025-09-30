@@ -175,15 +175,17 @@ class BackpackClient(ExchangeClient):
             signed=True
         )
 
-        # USDT 잔고 찾기
-        for balance in data.get('balances', []):
-            if balance['asset'] == 'USDT':
-                return Balance(
-                    asset='USDT',
-                    free=float(balance['available']),
-                    locked=float(balance['locked']),
-                    total=float(balance['total'])
-                )
+        # USDT 잔고 찾기 (응답 형식: {"USDT": {"available": "x", "locked": "y", ...}})
+        if 'USDT' in data:
+            usdt = data['USDT']
+            available = float(usdt.get('available', 0))
+            locked = float(usdt.get('locked', 0))
+            return Balance(
+                asset='USDT',
+                free=available,
+                locked=locked,
+                total=available + locked
+            )
 
         return Balance(asset='USDT', free=0.0, locked=0.0, total=0.0)
 
