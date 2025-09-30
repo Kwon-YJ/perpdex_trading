@@ -16,6 +16,6 @@
 - When adding Python packages, run: `source /project/arbitrage_bot/.venv/bin/activate; pip install {package_name}`.
 - Allocate **80% of resources to code implementation** and **20% to testing**.
 - Use the `./cluade_zone` folder as a working scratch space, and also store the **long-term plan** and **to-do list** there.
-- **Do not print results**; instead, create a file named `{UTC_current_time}.txt` under `./cluade_zone` and write outputs there.
+- **Do not print results**; instead, create a file named `{UTC_current_time}.txt` under `./cluade_zone` and write outputs there(korean).
 - Before starting the work, **check the contents of the `claude_zone` folder once**.
 - **Commit immediately after each file edit and push the changes.**
