@@ -10,13 +10,130 @@
 #   universal: false
 
 -e file:.
+aiohappyeyeballs==2.6.1
+    # via aiohttp
+aiohttp==3.12.15
+    # via grvt-pysdk
+aiosignal==1.4.0
+    # via aiohttp
+annotated-types==0.7.0
+    # via pydantic
+attrs==25.3.0
+    # via aiohttp
+backports-weakref==1.0.post1
+    # via grvt-pysdk
+bitarray==3.7.1
+    # via eth-account
+certifi==2025.8.3
+    # via requests
+cffi==2.0.0
+    # via cryptography
+charset-normalizer==3.4.3
+    # via requests
+ckzg==2.1.4
+    # via eth-account
+cryptography==46.0.1
+    # via perpdex-trading
+cytoolz==1.0.1
+    # via eth-utils
+dacite==1.9.2
+    # via grvt-pysdk
+dataclasses-json==0.6.7
+    # via grvt-pysdk
+eth-abi==5.2.0
+    # via eth-account
+eth-account==0.13.7
+    # via grvt-pysdk
+eth-hash==0.7.1
+    # via eth-utils
+eth-keyfile==0.8.1
+    # via eth-account
+eth-keys==0.7.0
+    # via eth-account
+    # via eth-keyfile
+eth-rlp==2.2.0
+    # via eth-account
+eth-typing==5.2.1
+    # via eth-abi
+    # via eth-keys
+    # via eth-utils
+eth-utils==5.3.1
+    # via eth-abi
+    # via eth-account
+    # via eth-keyfile
+    # via eth-keys
+    # via eth-rlp
+    # via rlp
+frozenlist==1.7.0
+    # via aiohttp
+    # via aiosignal
+grvt-pysdk==0.2.1
+    # via perpdex-trading
+hexbytes==1.3.1
+    # via eth-account
+    # via eth-rlp
+idna==3.10
+    # via requests
+    # via yarl
+inflection==0.5.1
+    # via grvt-pysdk
 iniconfig==2.1.0
     # via pytest
+marshmallow==3.26.1
+    # via dataclasses-json
+multidict==6.6.4
+    # via aiohttp
+    # via yarl
+mypy-extensions==1.1.0
+    # via typing-inspect
 packaging==25.0
+    # via marshmallow
     # via pytest
+parsimonious==0.10.0
+    # via eth-abi
 pluggy==1.6.0
     # via pytest
+propcache==0.3.2
+    # via aiohttp
+    # via yarl
+pycparser==2.23
+    # via cffi
+pycryptodome==3.23.0
+    # via eth-keyfile
+pydantic==2.11.9
+    # via eth-account
+    # via eth-utils
+pydantic-core==2.33.2
+    # via pydantic
 pygments==2.19.2
     # via pytest
 pytest==8.4.2
     # via perpdex-trading
+python-dotenv==1.1.1
+    # via perpdex-trading
+regex==2025.9.18
+    # via parsimonious
+requests==2.32.5
+    # via grvt-pysdk
+rlp==4.1.0
+    # via eth-account
+    # via eth-rlp
+toolz==1.0.0
+    # via cytoolz
+typing-extensions==4.15.0
+    # via aiosignal
+    # via eth-typing
+    # via pydantic
+    # via pydantic-core
+    # via typing-inspect
+    # via typing-inspection
+typing-inspect==0.9.0
+    # via dataclasses-json
+typing-inspection==0.4.1
+    # via pydantic
+urllib3==2.5.0
+    # via requests
+websockets==13.1
+    # via grvt-pysdk
+yarl==1.20.1
+    # via aiohttp

@@ -5,12 +5,19 @@ from typing import Dict, List, Optional, Tuple
 import time
 
 try:
-    from grvt_pysdk.grvt_ccxt_pro import GrvtCcxtPro
+    from pysdk.grvt_ccxt import GrvtCcxt as GrvtCcxtPro
+    from pysdk.grvt_ccxt_env import GrvtEnv
 except ImportError:
     try:
-        from grvt_pysdk import GrvtCcxtPro
+        from grvt_pysdk.grvt_ccxt_pro import GrvtCcxtPro
+        GrvtEnv = None
     except ImportError:
-        GrvtCcxtPro = None
+        try:
+            from grvt_pysdk import GrvtCcxtPro
+            GrvtEnv = None
+        except ImportError:
+            GrvtCcxtPro = None
+            GrvtEnv = None
 
 from base import (
     ExchangeClient, Asset, Balance, Order, OrderResult,
@@ -39,13 +46,20 @@ class GrvtClient(ExchangeClient):
             raise ImportError("grvt-pysdk가 설치되지 않았습니다")
 
         try:
-            self.client = GrvtCcxtPro(env='prod')
+            # GrvtCcxt는 env를 GrvtEnv Enum으로 받음
+            if GrvtEnv:
+                self.client = GrvtCcxtPro(env=GrvtEnv.PROD)
+            else:
+                self.client = GrvtCcxtPro(env='prod')
 
             # API 연결 테스트
-            await self.client.load_markets()
+            # load_markets는 동기 메서드임
+            self.client.load_markets()
             return True
         except Exception as e:
             print(f"GRVT 초기화 실패: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     async def get_available_assets(self) -> List[Asset]:

@@ -7,6 +7,9 @@ authors = [
 ]
 dependencies = [
     "pytest>=8.4.2",
+    "grvt-pysdk>=0.2.1",
+    "python-dotenv>=1.1.1",
+    "cryptography>=46.0.1",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
