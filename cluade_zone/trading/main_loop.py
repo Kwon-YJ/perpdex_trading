@@ -3,8 +3,8 @@ import asyncio
 import time
 from datetime import datetime
 from typing import List
-import os
 import sys
+from pathlib import Path
 
 sys.path.append('/home/kyj1435/project/perpdex_trading/cluade_zone/exchanges')
 sys.path.append('/home/kyj1435/project/perpdex_trading/cluade_zone/strategy')
@@ -21,34 +21,50 @@ class TradingBot:
     def __init__(
         self,
         clients: List[ExchangeClient],
-        profit_target: float = 1.0,  # 1원 이상 순이익
+        profit_target: float = 0.01,  # $0.01 이상 순이익
         capital_per_side: float = 100.0,  # 한쪽당 자본
         wait_time: int = 600,  # 10분 (초)
         use_correlation: bool = True
     ):
         self.clients = clients
-        self.portfolio_manager = PortfolioManager(clients, use_correlation=use_correlation)
         self.profit_target = profit_target
         self.capital_per_side = capital_per_side
         self.wait_time = wait_time
 
-        self.log_file = "/home/kyj1435/project/perpdex_trading/cluade_zone/trading_result.txt"
-        self.exchange_guide_file = "/home/kyj1435/project/perpdex_trading/cluade_zone/exchange_guide.txt"
-        self.exchange_guide_updater = ExchangeGuideUpdater(self.exchange_guide_file)
+        self.base_dir = Path("/home/kyj1435/project/perpdex_trading/cluade_zone")
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        self.session_log_file = self.base_dir / f"{timestamp}.txt"
+        self.session_log_file.touch(exist_ok=True)
+
+        self.log_file = self.base_dir / "trading_result.txt"
+        self.exchange_guide_file = self.base_dir / "exchange_guide.txt"
+        self.exchange_guide_updater = ExchangeGuideUpdater(str(self.exchange_guide_file))
+
+        self.portfolio_manager = PortfolioManager(
+            clients,
+            use_correlation=use_correlation,
+            logger=self.log
+        )
 
     def log(self, message: str):
         """로그 출력 및 파일 저장"""
         timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
         log_line = f"[{timestamp}] {message}\n"
 
-        print(log_line.strip())
+        target_paths = [self.log_file, self.session_log_file]
 
-        # 파일에 저장
-        try:
-            with open(self.log_file, "a") as f:
-                f.write(log_line)
-        except Exception as e:
-            print(f"로그 저장 실패: {e}")
+        for path in target_paths:
+            try:
+                with path.open("a", encoding="utf-8") as fp:
+                    fp.write(log_line)
+            except Exception:
+                # 파일 기록 실패 시 세션 로그에만 남김
+                if path != self.session_log_file:
+                    try:
+                        with self.session_log_file.open("a", encoding="utf-8") as fallback:
+                            fallback.write(f"[{timestamp}] 로그 파일 저장 실패: {message}\n")
+                    except Exception:
+                        pass
 
     async def run_cycle(self):
         """트레이딩 사이클 1회 실행"""
@@ -58,14 +74,18 @@ class TradingBot:
 
         try:
             # 1. 델타 중립 포트폴리오 생성
-            self.log("1단계: 델타 중립 포트폴리오 생성")
+            self.log("1단계: 델타 중립 바스켓 구성")
             long_basket, short_basket = await self.portfolio_manager.create_delta_neutral_portfolio(
                 total_capital_per_side=self.capital_per_side,
-                assets_per_exchange=3  # 화이트리스트에 3개 있음
+                assets_per_exchange=5
             )
 
-            self.log(f"롱 바스켓: {len(long_basket.orders)}개 주문, 목표 델타: ${long_basket.target_delta:.2f}")
-            self.log(f"숏 바스켓: {len(short_basket.orders)}개 주문, 목표 델타: ${short_basket.target_delta:.2f}")
+            self.log(
+                f"롱 바스켓: 주문 {len(long_basket.orders)}개, 목표 델타 ${long_basket.target_delta:.2f}"
+            )
+            self.log(
+                f"숏 바스켓: 주문 {len(short_basket.orders)}개, 목표 델타 ${short_basket.target_delta:.2f}"
+            )
 
             # 2. 포지션 진입
             self.log("2단계: 포지션 진입")
@@ -73,34 +93,38 @@ class TradingBot:
             short_positions = await self.portfolio_manager.execute_basket(short_basket)
 
             total_positions = len(long_positions) + len(short_positions)
-            self.log(f"포지션 진입 완료: {total_positions}개 (롱 {len(long_positions)}, 숏 {len(short_positions)})")
+            self.log(
+                f"포지션 진입 완료: 총 {total_positions}건 (롱 {len(long_positions)}건, 숏 {len(short_positions)}건)"
+            )
 
             if total_positions == 0:
-                self.log("⚠️  포지션 진입 실패, 사이클 종료")
+                self.log("⚠️ 포지션 진입에 실패하여 사이클을 종료합니다")
                 return
 
             # 3. 10분 대기
-            self.log(f"3단계: {self.wait_time}초 대기 중...")
+            self.log(f"3단계: {self.wait_time}초 대기")
             await asyncio.sleep(self.wait_time)
 
             # 4. 청산 조건 모니터링
             self.log("4단계: 청산 조건 모니터링")
             monitoring_interval = 10  # 10초마다 체크
             elapsed_time = 0
+            forced_liquidation = False
 
             while True:
                 # 청산 조건 1: 순이익 목표 달성
                 total_pnl, positions = await self.portfolio_manager.get_total_pnl()
-                self.log(f"[{elapsed_time}s] 현재 총 손익: ${total_pnl:.4f}")
+                self.log(f"[{elapsed_time}초] 누적 손익: ${total_pnl:.4f}")
 
                 if total_pnl >= self.profit_target:
-                    self.log(f"✓ 목표 달성! 순이익: ${total_pnl:.4f}")
+                    self.log(f"✓ 목표 손익 달성: ${total_pnl:.4f}")
                     break
 
                 # 청산 조건 2: 강제 청산 위험
                 at_risk = await self.portfolio_manager.check_liquidation_risk()
                 if at_risk:
-                    self.log("⚠️  강제 청산 위험 감지, 즉시 청산")
+                    self.log("⚠️ 강제 청산 또는 강제 청산 위험 감지, 즉시 청산 절차 진행")
+                    forced_liquidation = True
                     break
 
                 # 10초 대기 후 재확인
@@ -112,7 +136,11 @@ class TradingBot:
             close_results = await self.portfolio_manager.close_all_positions()
 
             for exchange, results in close_results.items():
-                self.log(f"{exchange}: {len(results)}개 포지션 청산")
+                self.log(f"{exchange}: 청산 완료 {len(results)}건")
+
+            if forced_liquidation:
+                await self._convert_all_assets_to_cash()
+                self.log("강제 청산 경보 후 현금화 루틴을 실행했습니다")
 
             # 6. 최종 손익 계산
             final_pnl, _ = await self.portfolio_manager.get_total_pnl()
@@ -135,11 +163,11 @@ class TradingBot:
 
         cycle_end = time.time()
         cycle_duration = cycle_end - cycle_start
-        self.log(f"사이클 완료 (소요 시간: {cycle_duration:.1f}초)")
+        self.log(f"사이클 완료 (소요 시간 {cycle_duration:.1f}초)")
         self.log("=" * 60)
 
         # 10분 대기 후 다음 사이클
-        self.log(f"{self.wait_time}초 대기 후 다음 사이클 시작...")
+        self.log(f"다음 사이클까지 {self.wait_time}초 대기")
         await asyncio.sleep(self.wait_time)
 
     async def update_exchange_guide(self):
@@ -167,6 +195,19 @@ class TradingBot:
         except Exception as e:
             self.log(f"자본 업데이트 실패: {e}")
 
+    async def _convert_all_assets_to_cash(self):
+        """강제 청산 발생 시 현금화 루틴"""
+        for client in self.clients:
+            try:
+                # 모든 포지션이 닫힌 상태인지 확인
+                await client.close_all_positions()
+                balance = await client.get_balance()
+                self.log(
+                    f"{client.name}: 잔여 자산 {balance.total} {balance.asset} 현금 보유 상태 확인"
+                )
+            except Exception as e:
+                self.log(f"{client.name}: 현금화 절차 실패 {e}")
+
     async def run(self):
         """봇 메인 루프 (무한 반복)"""
         self.log("트레이딩 봇 시작")
@@ -186,7 +227,8 @@ class TradingBot:
         cycle_count = 0
         while True:
             cycle_count += 1
-            self.log(f"\n사이클 #{cycle_count} 시작")
+            self.log("")
+            self.log(f"사이클 #{cycle_count} 시작")
 
             try:
                 await self.run_cycle()
@@ -199,37 +241,3 @@ class TradingBot:
                 self.log("1분 대기 후 재시도...")
                 await asyncio.sleep(60)
 
-
-async def main():
-    """메인 함수"""
-    from dotenv import load_dotenv
-    load_dotenv()
-
-    # Backpack 클라이언트만 사용 (테스트)
-    sys.path.append('/home/kyj1435/project/perpdex_trading/cluade_zone/exchanges')
-    from backpack_client import BackpackClient
-
-    backpack_api_key = os.getenv("BACKPACK_PUBLIC_KEY")
-    backpack_secret_key = os.getenv("BACKPACK_PRIVATE_KEY")
-
-    if not backpack_api_key or not backpack_secret_key:
-        print("Backpack API 키가 설정되지 않았습니다")
-        return
-
-    # 클라이언트 생성
-    clients = [
-        BackpackClient(backpack_api_key, backpack_secret_key)
-    ]
-
-    # 봇 생성 및 실행
-    bot = TradingBot(
-        clients=clients,
-        profit_target=1.0,  # $1 이상 순이익
-        wait_time=600  # 10분
-    )
-
-    await bot.run()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
