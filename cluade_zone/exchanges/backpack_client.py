@@ -72,9 +72,15 @@ class BackpackClient(ExchangeClient):
             instruction = endpoint.split('/')[-1]
 
         # 서명 페이로드 생성
-        if params and method == "GET":
-            param_str = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
-            sign_str = f"instruction={instruction}&{param_str}&timestamp={timestamp}&window={window}"
+        if params:
+            if method == "GET":
+                param_str = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+                sign_str = f"instruction={instruction}&{param_str}&timestamp={timestamp}&window={window}"
+            else:  # POST/DELETE - params are in body, so we need to serialize and include
+                import json
+                # Sort keys for consistency
+                param_str = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+                sign_str = f"instruction={instruction}&{param_str}&timestamp={timestamp}&window={window}"
         else:
             sign_str = f"instruction={instruction}&timestamp={timestamp}&window={window}"
 

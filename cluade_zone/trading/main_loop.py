@@ -58,8 +58,8 @@ class TradingBot:
             # 1. 델타 중립 포트폴리오 생성
             self.log("1단계: 델타 중립 포트폴리오 생성")
             long_basket, short_basket = await self.portfolio_manager.create_delta_neutral_portfolio(
-                total_capital_per_side=100.0,  # 한 쪽당 $100
-                assets_per_exchange=3
+                total_capital_per_side=50.0,  # 한 쪽당 $50 (테스트용 소액)
+                assets_per_exchange=2  # 자산 수 줄임 (2개)
             )
 
             self.log(f"롱 바스켓: {len(long_basket.orders)}개 주문, 목표 델타: ${long_basket.target_delta:.2f}")
@@ -83,15 +83,16 @@ class TradingBot:
 
             # 4. 청산 조건 모니터링
             self.log("4단계: 청산 조건 모니터링")
-            liquidated = False
+            monitoring_interval = 10  # 10초마다 체크
+            elapsed_time = 0
 
-            while not liquidated:
-                # 청산 조건 1: 순이익 1원 이상
+            while True:
+                # 청산 조건 1: 순이익 목표 달성
                 total_pnl, positions = await self.portfolio_manager.get_total_pnl()
-                self.log(f"현재 총 손익: ${total_pnl:.2f}")
+                self.log(f"[{elapsed_time}s] 현재 총 손익: ${total_pnl:.4f}")
 
                 if total_pnl >= self.profit_target:
-                    self.log(f"✓ 목표 달성! 순이익: ${total_pnl:.2f}")
+                    self.log(f"✓ 목표 달성! 순이익: ${total_pnl:.4f}")
                     break
 
                 # 청산 조건 2: 강제 청산 위험
@@ -100,8 +101,9 @@ class TradingBot:
                     self.log("⚠️  강제 청산 위험 감지, 즉시 청산")
                     break
 
-                # 1초 대기 후 재확인
-                await asyncio.sleep(1)
+                # 10초 대기 후 재확인
+                await asyncio.sleep(monitoring_interval)
+                elapsed_time += monitoring_interval
 
             # 5. 모든 포지션 청산
             self.log("5단계: 모든 포지션 청산")

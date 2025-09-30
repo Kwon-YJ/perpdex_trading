@@ -172,13 +172,16 @@ class PortfolioManager:
                     # 주문 크기 계산 (델타 = size * price)
                     size = capital_per_asset / price
 
+                    # Backpack은 decimal precision이 엄격하므로 최대 2자리로 제한
+                    safe_precision = min(asset.size_precision, 2)
+
+                    # 정밀도에 맞춰 반올림
+                    size = round(size, safe_precision)
+
                     # 최소 주문 크기 체크
                     if size < asset.min_size:
                         print(f"{asset.symbol} 주문 크기가 너무 작음: {size} < {asset.min_size}")
                         continue
-
-                    # 정밀도에 맞춰 반올림
-                    size = round(size, asset.size_precision)
 
                     orders.append(Order(
                         symbol=asset.symbol,

@@ -19,5 +19,3 @@
 - **Do not print results**; instead, create a file named `{UTC_current_time}.txt` under `./cluade_zone` and write outputs there.
 - Before starting the work, **check the contents of the `claude_zone` folder once**.
 - **Commit immediately after each file edit and push the changes.**
-
-- 마지막 작업에서(cluade_zone/20250930_092826.txt) backpack 잔고가 0이라는 너의 주장은 잘못되었다. src/perpdex_trading/test_backpack_capital.py 참고.
