@@ -1,14 +1,19 @@
 """exchange_guide.txt 자본 업데이트 유틸리티"""
 import csv
-from typing import Dict, List
+from typing import Dict, List, Optional, Callable
 import os
 
 
 class ExchangeGuideUpdater:
     """exchange_guide.txt 파일의 현재자본 컬럼 업데이트"""
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, logger: Optional[Callable[[str], None]] = None):
         self.file_path = file_path
+        self.logger = logger
+
+    def _log(self, message: str):
+        if self.logger:
+            self.logger(message)
 
     def read_exchange_guide(self) -> List[Dict[str, str]]:
         """exchange_guide.txt 읽기"""
@@ -58,14 +63,14 @@ class ExchangeGuideUpdater:
 
             if updated:
                 self.write_exchange_guide(rows)
-                print(f"✓ {exchange_name} 현재자본 업데이트: {current_capital}")
+                self._log(f"✓ {exchange_name} 현재자본 업데이트: {current_capital}")
                 return True
             else:
-                print(f"⚠️  {exchange_name}을(를) exchange_guide.txt에서 찾을 수 없습니다")
+                self._log(f"⚠️ {exchange_name}: exchange_guide.txt에서 거래소를 찾지 못함")
                 return False
 
         except Exception as e:
-            print(f"✗ exchange_guide.txt 업데이트 실패: {e}")
+            self._log(f"✗ exchange_guide.txt 업데이트 실패: {e}")
             return False
 
     def update_multiple_capitals(self, capital_map: Dict[str, float]) -> Dict[str, bool]:
@@ -87,19 +92,19 @@ class ExchangeGuideUpdater:
                 if exchange_name in capital_map:
                     row['현재자본'] = str(capital_map[exchange_name])
                     results[exchange_name] = True
-                    print(f"✓ {exchange_name} 현재자본 업데이트: {capital_map[exchange_name]}")
+                    self._log(f"✓ {exchange_name} 현재자본 업데이트: {capital_map[exchange_name]}")
 
             # 업데이트되지 않은 거래소 표시
             for exchange_name in capital_map:
                 if exchange_name not in results:
                     results[exchange_name] = False
-                    print(f"⚠️  {exchange_name}을(를) exchange_guide.txt에서 찾을 수 없습니다")
+                    self._log(f"⚠️ {exchange_name}: exchange_guide.txt에서 거래소를 찾지 못함")
 
             self.write_exchange_guide(rows)
             return results
 
         except Exception as e:
-            print(f"✗ exchange_guide.txt 업데이트 실패: {e}")
+            self._log(f"✗ exchange_guide.txt 업데이트 실패: {e}")
             return {exchange_name: False for exchange_name in capital_map}
 
     def get_exchange_info(self, exchange_name: str) -> Dict[str, str]:
@@ -111,7 +116,7 @@ class ExchangeGuideUpdater:
                     return row
             return {}
         except Exception as e:
-            print(f"✗ 거래소 정보 조회 실패: {e}")
+            self._log(f"✗ 거래소 정보 조회 실패: {e}")
             return {}
 
     def get_all_exchanges(self) -> List[str]:
@@ -120,5 +125,5 @@ class ExchangeGuideUpdater:
             rows = self.read_exchange_guide()
             return [row.get('거래소명') for row in rows if row.get('거래소명')]
         except Exception as e:
-            print(f"✗ 거래소 목록 조회 실패: {e}")
+            self._log(f"✗ 거래소 목록 조회 실패: {e}")
             return []
