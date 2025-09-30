@@ -42,11 +42,17 @@ async def main():
         if api_key and secret_key:
             try:
                 backpack = BackpackClient(api_key, secret_key)
-                clients.append(backpack)
-                print("✓ Backpack 클라이언트 준비 완료")
+                initialized = await backpack.initialize()
+
+                if initialized:
+                    clients.append(backpack)
+                    print("✓ Backpack 클라이언트 준비 완료")
+                else:
+                    print("✗ Backpack 클라이언트 초기화 실패")
+                    await backpack.close()
             except Exception as e:
                 print(f"✗ Backpack 클라이언트 생성 실패: {e}")
-
+        
     # GRVT는 SDK가 설치되지 않아 스킵
 
     if not clients:

@@ -13,7 +13,6 @@
 aiohappyeyeballs==2.6.1
     # via aiohttp
 aiohttp==3.12.15
-    # via grvt-pysdk
     # via web3
 aiosignal==1.4.0
     # via aiohttp
@@ -21,8 +20,6 @@ annotated-types==0.7.0
     # via pydantic
 attrs==25.3.0
     # via aiohttp
-backports-weakref==1.0.post1
-    # via grvt-pysdk
 bitarray==3.7.1
     # via eth-account
 certifi==2025.8.3
@@ -33,29 +30,27 @@ charset-normalizer==3.4.3
     # via requests
 ckzg==2.1.4
     # via eth-account
+colorful==0.5.7
+    # via prettyprinter
 cryptography==46.0.1
     # via perpdex-trading
 cytoolz==1.0.1
     # via eth-utils
-dacite==1.9.2
-    # via grvt-pysdk
-dataclasses-json==0.6.7
-    # via grvt-pysdk
 eth-abi==5.2.0
     # via eth-account
     # via perpdex-trading
     # via web3
 eth-account==0.13.7
-    # via grvt-pysdk
     # via web3
 eth-hash==0.7.1
     # via eth-utils
     # via web3
 eth-keyfile==0.8.1
     # via eth-account
-eth-keys==0.7.0
+eth-keys==0.6.1
     # via eth-account
     # via eth-keyfile
+    # via hibachi-xyz
 eth-rlp==2.2.0
     # via eth-account
 eth-typing==5.2.1
@@ -74,33 +69,32 @@ eth-utils==5.3.1
 frozenlist==1.7.0
     # via aiohttp
     # via aiosignal
-grvt-pysdk==0.2.1
-    # via perpdex-trading
 hexbytes==1.3.1
     # via eth-account
     # via eth-rlp
     # via web3
+hibachi-xyz==0.1.14
+    # via perpdex-trading
 idna==3.10
     # via requests
     # via yarl
-inflection==0.5.1
-    # via grvt-pysdk
 iniconfig==2.1.0
     # via pytest
-marshmallow==3.26.1
-    # via dataclasses-json
 multidict==6.6.4
     # via aiohttp
     # via yarl
-mypy-extensions==1.1.0
-    # via typing-inspect
 packaging==25.0
-    # via marshmallow
     # via pytest
 parsimonious==0.10.0
     # via eth-abi
+pip==25.2
+    # via pip-system-certs
+pip-system-certs==5.2
+    # via hibachi-xyz
 pluggy==1.6.0
     # via pytest
+prettyprinter==0.18.0
+    # via hibachi-xyz
 propcache==0.3.2
     # via aiohttp
     # via yarl
@@ -116,35 +110,35 @@ pydantic==2.11.9
 pydantic-core==2.33.2
     # via pydantic
 pygments==2.19.2
+    # via prettyprinter
     # via pytest
 pytest==8.4.2
     # via perpdex-trading
 python-dotenv==1.1.1
+    # via hibachi-xyz
     # via perpdex-trading
 pyunormalize==17.0.0
     # via web3
 regex==2025.9.18
     # via parsimonious
-requests==2.32.5
-    # via grvt-pysdk
+requests==2.32.3
+    # via hibachi-xyz
     # via web3
 rlp==4.1.0
     # via eth-account
     # via eth-rlp
+toml==0.10.2
+    # via hibachi-xyz
 toolz==1.0.0
     # via cytoolz
 types-requests==2.32.4.20250913
     # via web3
 typing-extensions==4.15.0
-    # via aiosignal
     # via eth-typing
     # via pydantic
     # via pydantic-core
-    # via typing-inspect
     # via typing-inspection
     # via web3
-typing-inspect==0.9.0
-    # via dataclasses-json
 typing-inspection==0.4.1
     # via pydantic
 urllib3==2.5.0
@@ -152,8 +146,9 @@ urllib3==2.5.0
     # via types-requests
 web3==7.13.0
     # via perpdex-trading
-websockets==13.1
-    # via grvt-pysdk
+websockets==15.0.1
+    # via hibachi-xyz
+    # via perpdex-trading
     # via web3
 yarl==1.20.1
     # via aiohttp
