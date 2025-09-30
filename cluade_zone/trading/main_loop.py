@@ -38,7 +38,10 @@ class TradingBot:
 
         self.log_file = self.base_dir / "trading_result.txt"
         self.exchange_guide_file = self.base_dir / "exchange_guide.txt"
-        self.exchange_guide_updater = ExchangeGuideUpdater(str(self.exchange_guide_file))
+        self.exchange_guide_updater = ExchangeGuideUpdater(
+            str(self.exchange_guide_file),
+            logger=self.log
+        )
 
         self.portfolio_manager = PortfolioManager(
             clients,
@@ -240,4 +243,3 @@ class TradingBot:
                 # 1분 대기 후 재시도
                 self.log("1분 대기 후 재시도...")
                 await asyncio.sleep(60)
-
