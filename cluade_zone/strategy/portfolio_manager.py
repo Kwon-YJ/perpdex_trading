@@ -1,6 +1,6 @@
 """델타 중립 포트폴리오 관리자"""
 import random
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Callable, Optional
 from dataclasses import dataclass
 import asyncio
 
@@ -24,11 +24,24 @@ class PortfolioBasket:
 class PortfolioManager:
     """델타 중립 포트폴리오 매니저"""
 
-    def __init__(self, clients: List[ExchangeClient], use_correlation: bool = True):
+    def __init__(
+        self,
+        clients: List[ExchangeClient],
+        use_correlation: bool = True,
+        logger: Optional[Callable[[str], None]] = None
+    ):
         self.clients = clients
         self.clients_map = {c.name: c for c in clients}
         self.use_correlation = use_correlation
         self.correlation_calculator = CorrelationCalculator(clients) if use_correlation else None
+        self.logger = logger
+
+    def _log(self, message: str):
+        """로깅 헬퍼"""
+        if self.logger:
+            self.logger(message)
+        else:
+            print(message)
 
     async def create_delta_neutral_portfolio(
         self,
@@ -52,26 +65,33 @@ class PortfolioManager:
         if len(exchanges) == 1:
             long_exchanges = exchanges
             short_exchanges = exchanges
-            print(f"⚠️  단일 거래소 모드: {exchanges[0]}")
-            print(f"   롱/숏 포지션을 같은 거래소에서 거래합니다")
+            self._log(f"⚠️ 단일 거래소 환경 감지: {exchanges[0]}")
+            self._log("   롱/숏 포지션을 동일 거래소에서 처리합니다")
         else:
             random.shuffle(exchanges)
             mid = len(exchanges) // 2
             long_exchanges = exchanges[:mid]
             short_exchanges = exchanges[mid:]
-            print(f"롱 거래소: {long_exchanges}")
-            print(f"숏 거래소: {short_exchanges}")
+
+            # 한쪽이 비어 있으면 균형 조정
+            if not long_exchanges and short_exchanges:
+                long_exchanges.append(short_exchanges.pop())
+            elif not short_exchanges and long_exchanges:
+                short_exchanges.append(long_exchanges.pop())
+
+            self._log(f"롱 그룹 거래소: {long_exchanges}")
+            self._log(f"숏 그룹 거래소: {short_exchanges}")
 
         # 2. 상관계수 기반 자산 선택 (또는 랜덤)
         if self.use_correlation and self.correlation_calculator:
-            print("상관계수 기반 자산 선택 중...")
+            self._log("상관계수 기반 자산을 선정합니다")
             long_assets_map, short_assets_map = await self.correlation_calculator.select_best_correlated_assets(
                 long_exchanges,
                 short_exchanges,
                 target_assets_per_exchange=assets_per_exchange
             )
         else:
-            print("랜덤 자산 선택 중...")
+            self._log("상관계수 계산 비활성화: 무작위 자산을 사용합니다")
             long_assets_map = None
             short_assets_map = None
 
@@ -84,29 +104,26 @@ class PortfolioManager:
             preselected_assets=long_assets_map
         )
 
+        used_symbols = {order.symbol for order in long_orders}
+
         short_orders = await self._create_basket_orders(
             short_exchanges,
             OrderSide.SHORT,
             total_capital_per_side,
             assets_per_exchange,
-            preselected_assets=short_assets_map
+            preselected_assets=short_assets_map,
+            excluded_symbols=used_symbols
         )
 
         # 3. 델타 계산 및 균형 맞추기
-        long_delta = await self._calculate_basket_delta(long_orders)
-        short_delta = await self._calculate_basket_delta(short_orders)
+        long_orders, short_orders, long_delta, short_delta = await self._balance_baskets(
+            long_orders,
+            short_orders
+        )
 
-        print(f"초기 롱 델타: ${long_delta:.2f}")
-        print(f"초기 숏 델타: ${short_delta:.2f}")
-
-        # 숏 델타를 롱 델타에 맞춰 조정
-        if abs(short_delta) > 0:
-            adjustment_factor = abs(long_delta / short_delta)
-            short_orders = self._adjust_order_sizes(short_orders, adjustment_factor)
-            short_delta = await self._calculate_basket_delta(short_orders)
-
-        print(f"조정된 숏 델타: ${short_delta:.2f}")
-        print(f"순 델타: ${long_delta + short_delta:.2f}")
+        self._log(f"롱 델타 추정값: ${long_delta:.2f}")
+        self._log(f"숏 델타 추정값: ${short_delta:.2f}")
+        self._log(f"총 델타: ${long_delta + short_delta:.2f}")
 
         long_basket = PortfolioBasket(
             side=OrderSide.LONG,
@@ -130,7 +147,8 @@ class PortfolioManager:
         side: OrderSide,
         total_capital: float,
         assets_per_exchange: int,
-        preselected_assets: Dict[str, List[Asset]] = None
+        preselected_assets: Dict[str, List[Asset]] = None,
+        excluded_symbols: Optional[set] = None
     ) -> List[Order]:
         """바스켓 주문 생성"""
         orders = []
@@ -148,18 +166,24 @@ class PortfolioManager:
 
             # 사전 선택된 자산이 있으면 사용, 없으면 화이트리스트 기반 선택
             if preselected_assets and exchange_name in preselected_assets:
-                selected_assets = preselected_assets[exchange_name]
-                print(f"{exchange_name}: 상관계수 기반 {len(selected_assets)}개 자산 선택됨")
+                selected_assets = [
+                    asset for asset in preselected_assets[exchange_name]
+                    if not excluded_symbols or asset.symbol not in excluded_symbols
+                ]
+                self._log(f"{exchange_name}: 상관계수 기반 자산 {len(selected_assets)}개 확보")
+                if not selected_assets:
+                    self._log(f"{exchange_name}: 제외 조건으로 사용 가능한 자산이 없어 스킵")
+                    continue
             else:
                 # 거래 가능한 자산 조회
                 try:
                     available_assets = await client.get_available_assets()
                 except Exception as e:
-                    print(f"{exchange_name} 자산 조회 실패: {e}")
+                    self._log(f"{exchange_name}: 자산 목록 조회 실패 {e}")
                     continue
 
                 if not available_assets:
-                    print(f"{exchange_name}에 거래 가능한 자산이 없습니다")
+                    self._log(f"{exchange_name}: 거래 가능한 자산이 없습니다")
                     continue
 
                 # 화이트리스트에서 사용 가능한 자산만 필터링
@@ -168,8 +192,14 @@ class PortfolioManager:
                     if asset.symbol in WHITELISTED_SYMBOLS
                 ]
 
+                if excluded_symbols:
+                    whitelisted_assets = [
+                        asset for asset in whitelisted_assets
+                        if asset.symbol not in excluded_symbols
+                    ]
+
                 if not whitelisted_assets:
-                    print(f"{exchange_name}에 화이트리스트 자산이 없습니다")
+                    self._log(f"{exchange_name}: 허용된 자산을 찾지 못했습니다")
                     continue
 
                 # 화이트리스트에서 랜덤으로 3~5개 자산 선택 (최대 가능한 만큼)
@@ -178,8 +208,13 @@ class PortfolioManager:
                     len(whitelisted_assets),
                     assets_per_exchange
                 )
+                if num_assets == 0:
+                    self._log(f"{exchange_name}: 제외 조건으로 선택 가능한 자산이 없습니다")
+                    continue
                 selected_assets = random.sample(whitelisted_assets, num_assets)
-                print(f"{exchange_name}: 화이트리스트에서 {len(selected_assets)}개 자산 선택됨 {[a.symbol for a in selected_assets]}")
+                self._log(
+                    f"{exchange_name}: 화이트리스트 자산 {len(selected_assets)}개 선정 { [a.symbol for a in selected_assets] }"
+                )
 
             # 각 자산에 균등 배분
             num_assets = len(selected_assets)
@@ -203,7 +238,7 @@ class PortfolioManager:
 
                     # 최소 크기 미달 시 최소 크기의 2배로 설정
                     if size < min_required:
-                        print(f"{asset.symbol} 주문 크기 조정: {size:.6f} -> {min_required:.6f}")
+                        self._log(f"{asset.symbol}: 주문 수량을 {size:.6f}→{min_required:.6f}로 조정")
                         size = min_required
 
                     # 정밀도에 맞춰 반올림
@@ -211,7 +246,7 @@ class PortfolioManager:
 
                     # 다시 최소 크기 체크 (반올림 후)
                     if size < asset.min_size:
-                        print(f"{asset.symbol} 주문 크기가 여전히 작음: {size} < {asset.min_size}, 스킵")
+                        self._log(f"{asset.symbol}: 주문 수량이 최소치 미만이라 건너뜀 ({size} < {asset.min_size})")
                         continue
 
                     orders.append(Order(
@@ -224,7 +259,7 @@ class PortfolioManager:
                     ))
 
                 except Exception as e:
-                    print(f"{asset.symbol} 주문 생성 실패: {e}")
+                    self._log(f"{asset.symbol}: 주문 생성 실패 {e}")
                     continue
 
         return orders
@@ -248,10 +283,49 @@ class PortfolioManager:
 
                 total_delta += delta
             except Exception as e:
-                print(f"{order.symbol} 델타 계산 실패: {e}")
+                self._log(f"{order.symbol}: 델타 계산 실패 {e}")
                 continue
 
         return total_delta
+
+    async def _balance_baskets(
+        self,
+        long_orders: List[Order],
+        short_orders: List[Order],
+        tolerance: float = 0.5
+    ) -> Tuple[List[Order], List[Order], float, float]:
+        """롱/숏 바스켓의 델타를 균형 맞춤"""
+        long_delta = await self._calculate_basket_delta(long_orders)
+        short_delta = await self._calculate_basket_delta(short_orders)
+
+        if not long_orders or not short_orders:
+            return long_orders, short_orders, long_delta, short_delta
+
+        attempts = 0
+        while attempts < 5 and abs(long_delta + short_delta) > tolerance:
+            long_abs = abs(long_delta)
+            short_abs = abs(short_delta)
+
+            if long_abs < 1e-9 or short_abs < 1e-9:
+                break
+
+            if long_abs > short_abs:
+                factor = short_abs / long_abs
+                long_orders = self._adjust_order_sizes(long_orders, factor)
+            else:
+                factor = long_abs / short_abs
+                short_orders = self._adjust_order_sizes(short_orders, factor)
+
+            long_delta = await self._calculate_basket_delta(long_orders)
+            short_delta = await self._calculate_basket_delta(short_orders)
+            attempts += 1
+
+        if abs(long_delta + short_delta) > tolerance:
+            self._log(
+                f"⚠️ 델타 불균형이 남아 있습니다 (잔여 델타 ${long_delta + short_delta:.2f})"
+            )
+
+        return long_orders, short_orders, long_delta, short_delta
 
     def _adjust_order_sizes(
         self,
@@ -259,10 +333,16 @@ class PortfolioManager:
         factor: float
     ) -> List[Order]:
         """주문 크기 조정"""
+        if factor <= 0:
+            return orders
+
         adjusted_orders = []
 
         for order in orders:
-            adjusted_size = order.size * factor
+            adjusted_size = round(order.size * factor, 6)
+            if adjusted_size <= 0:
+                adjusted_size = max(order.size * 0.1, 1e-6)
+
             adjusted_orders.append(Order(
                 symbol=order.symbol,
                 side=order.side,
@@ -295,12 +375,15 @@ class PortfolioManager:
         for order in basket.orders:
             client = self._get_client_for_order(order)
             if client is None:
-                print(f"{order.symbol} 거래소를 찾을 수 없음")
+                self._log(f"{order.symbol}: 연결된 거래소를 찾지 못해 주문을 건너뜀")
                 continue
 
             try:
                 result = await client.place_order(order)
-                print(f"✓ {result.symbol} {result.side.value} {result.size} @ ${result.filled_price}")
+                side_label = "롱" if result.side == OrderSide.LONG else "숏"
+                self._log(
+                    f"✓ {client.name} | {result.symbol} {side_label} {result.size} @ ${result.filled_price}"
+                )
 
                 # 포지션 객체 생성
                 position = Position(
@@ -316,7 +399,7 @@ class PortfolioManager:
                 positions.append(position)
 
             except Exception as e:
-                print(f"✗ {order.symbol} 주문 실패: {e}")
+                self._log(f"✗ {client.name} | {order.symbol} 주문 실패: {e}")
                 continue
 
         return positions
@@ -330,7 +413,7 @@ class PortfolioManager:
                 positions = await client.get_positions()
                 all_positions.extend(positions)
             except Exception as e:
-                print(f"{client.name} 포지션 조회 실패: {e}")
+                self._log(f"{client.name}: 포지션 조회 실패 {e}")
                 continue
 
         total_pnl = sum(pos.unrealized_pnl for pos in all_positions)
@@ -343,10 +426,10 @@ class PortfolioManager:
             try:
                 at_risk = await client.check_liquidation_risk()
                 if at_risk:
-                    print(f"⚠️  {client.name}에서 청산 위험 감지!")
+                    self._log(f"⚠️ {client.name}: 청산 위험 감지")
                     return True
             except Exception as e:
-                print(f"{client.name} 청산 위험 체크 실패: {e}")
+                self._log(f"{client.name}: 청산 위험 점검 실패 {e}")
                 continue
 
         return False
@@ -359,9 +442,10 @@ class PortfolioManager:
             try:
                 close_results = await client.close_all_positions()
                 results[client.name] = close_results
-                print(f"✓ {client.name} 포지션 청산 완료: {len(close_results)}개")
+                self._log(f"✓ {client.name}: 포지션 {len(close_results)}개 청산 완료")
             except Exception as e:
-                print(f"✗ {client.name} 포지션 청산 실패: {e}")
+                self._log(f"✗ {client.name}: 포지션 청산 실패 {e}")
                 results[client.name] = []
 
         return results
+
