@@ -13,13 +13,24 @@
 aiohappyeyeballs==2.6.1
     # via aiohttp
 aiohttp==3.12.15
+    # via aiohttp-retry
+    # via lighter-sdk
+    # via ostium-python-sdk
     # via web3
+aiohttp-retry==2.9.1
+    # via lighter-sdk
 aiosignal==1.4.0
     # via aiohttp
 annotated-types==0.7.0
     # via pydantic
+anyio==4.11.0
+    # via gql
+asyncio==4.0.0
+    # via ostium-python-sdk
 attrs==25.3.0
     # via aiohttp
+backoff==2.2.1
+    # via gql
 base58==2.1.1
     # via perpdex-trading
 bitarray==3.7.1
@@ -34,6 +45,8 @@ ckzg==2.1.4
     # via eth-account
 colorful==0.5.7
     # via prettyprinter
+coverage==7.10.7
+    # via pytest-cov
 cryptography==46.0.1
     # via perpdex-trading
 cytoolz==1.0.1
@@ -43,6 +56,8 @@ eth-abi==5.2.0
     # via perpdex-trading
     # via web3
 eth-account==0.13.7
+    # via lighter-sdk
+    # via perpdex-trading
     # via web3
 eth-hash==0.7.1
     # via eth-utils
@@ -71,22 +86,34 @@ eth-utils==5.3.1
 frozenlist==1.7.0
     # via aiohttp
     # via aiosignal
+gql==3.5.0
+    # via ostium-python-sdk
+graphql-core==3.2.5
+    # via gql
+    # via ostium-python-sdk
 hexbytes==1.3.1
     # via eth-account
     # via eth-rlp
     # via web3
 hibachi-xyz==0.1.14
     # via perpdex-trading
+humanize==4.13.0
+    # via ostium-python-sdk
 idna==3.10
+    # via anyio
     # via requests
     # via yarl
 iniconfig==2.1.0
     # via pytest
 jsonalias==0.1.1
     # via solders
+lighter-sdk==0.1.4
+    # via perpdex-trading
 multidict==6.6.4
     # via aiohttp
     # via yarl
+ostium-python-sdk==2.0.21
+    # via perpdex-trading
 packaging==25.0
     # via pytest
 parsimonious==0.10.0
@@ -97,6 +124,7 @@ pip-system-certs==5.2
     # via hibachi-xyz
 pluggy==1.6.0
     # via pytest
+    # via pytest-cov
 prettyprinter==0.18.0
     # via hibachi-xyz
 propcache==0.3.2
@@ -110,6 +138,8 @@ pycryptodome==3.23.0
 pydantic==2.11.9
     # via eth-account
     # via eth-utils
+    # via lighter-sdk
+    # via ostium-python-sdk
     # via web3
 pydantic-core==2.33.2
     # via pydantic
@@ -117,9 +147,19 @@ pygments==2.19.2
     # via prettyprinter
     # via pytest
 pytest==8.4.2
+    # via ostium-python-sdk
     # via perpdex-trading
+    # via pytest-asyncio
+    # via pytest-cov
+pytest-asyncio==1.2.0
+    # via ostium-python-sdk
+pytest-cov==7.0.0
+    # via ostium-python-sdk
+python-dateutil==2.9.0.post0
+    # via lighter-sdk
 python-dotenv==1.1.1
     # via hibachi-xyz
+    # via ostium-python-sdk
     # via perpdex-trading
 pyunormalize==17.0.0
     # via web3
@@ -127,10 +167,16 @@ regex==2025.9.18
     # via parsimonious
 requests==2.32.3
     # via hibachi-xyz
+    # via lighter-sdk
+    # via ostium-python-sdk
     # via web3
 rlp==4.1.0
     # via eth-account
     # via eth-rlp
+six==1.17.0
+    # via python-dateutil
+sniffio==1.3.1
+    # via anyio
 solders==0.26.0
     # via perpdex-trading
 toml==0.10.2
@@ -141,6 +187,7 @@ types-requests==2.32.4.20250913
     # via web3
 typing-extensions==4.15.0
     # via eth-typing
+    # via lighter-sdk
     # via pydantic
     # via pydantic-core
     # via solders
@@ -148,14 +195,18 @@ typing-extensions==4.15.0
     # via web3
 typing-inspection==0.4.1
     # via pydantic
-urllib3==2.5.0
+urllib3==2.0.7
+    # via lighter-sdk
     # via requests
     # via types-requests
 web3==7.13.0
+    # via ostium-python-sdk
     # via perpdex-trading
 websockets==15.0.1
     # via hibachi-xyz
+    # via lighter-sdk
     # via perpdex-trading
     # via web3
 yarl==1.20.1
     # via aiohttp
+    # via gql

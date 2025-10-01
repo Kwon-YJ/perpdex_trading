@@ -15,6 +15,9 @@ dependencies = [
     "websockets>=15.0.1",
     "base58>=2.1.1",
     "solders>=0.26.0",
+    "ostium-python-sdk>=2.0.21",
+    "lighter-sdk>=0.1.4",
+    "eth-account>=0.13.7",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
