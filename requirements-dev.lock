@@ -20,6 +20,8 @@ annotated-types==0.7.0
     # via pydantic
 attrs==25.3.0
     # via aiohttp
+base58==2.1.1
+    # via perpdex-trading
 bitarray==3.7.1
     # via eth-account
 certifi==2025.8.3
@@ -80,6 +82,8 @@ idna==3.10
     # via yarl
 iniconfig==2.1.0
     # via pytest
+jsonalias==0.1.1
+    # via solders
 multidict==6.6.4
     # via aiohttp
     # via yarl
@@ -127,6 +131,8 @@ requests==2.32.3
 rlp==4.1.0
     # via eth-account
     # via eth-rlp
+solders==0.26.0
+    # via perpdex-trading
 toml==0.10.2
     # via hibachi-xyz
 toolz==1.0.0
@@ -137,6 +143,7 @@ typing-extensions==4.15.0
     # via eth-typing
     # via pydantic
     # via pydantic-core
+    # via solders
     # via typing-inspection
     # via web3
 typing-inspection==0.4.1

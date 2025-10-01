@@ -13,6 +13,8 @@ dependencies = [
     "web3>=7.13.0",
     "hibachi-xyz>=0.1.14",
     "websockets>=15.0.1",
+    "base58>=2.1.1",
+    "solders>=0.26.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
