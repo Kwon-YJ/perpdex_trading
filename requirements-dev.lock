@@ -56,6 +56,7 @@ eth-abi==5.2.0
     # via perpdex-trading
     # via web3
 eth-account==0.13.7
+    # via hyperliquid-python-sdk
     # via lighter-sdk
     # via perpdex-trading
     # via web3
@@ -81,6 +82,7 @@ eth-utils==5.3.1
     # via eth-keyfile
     # via eth-keys
     # via eth-rlp
+    # via hyperliquid-python-sdk
     # via rlp
     # via web3
 frozenlist==1.7.0
@@ -99,6 +101,8 @@ hibachi-xyz==0.1.14
     # via perpdex-trading
 humanize==4.13.0
     # via ostium-python-sdk
+hyperliquid-python-sdk==0.19.0
+    # via perpdex-trading
 idna==3.10
     # via anyio
     # via requests
@@ -109,6 +113,8 @@ jsonalias==0.1.1
     # via solders
 lighter-sdk==0.1.4
     # via perpdex-trading
+msgpack==1.1.1
+    # via hyperliquid-python-sdk
 multidict==6.6.4
     # via aiohttp
     # via yarl
@@ -167,6 +173,7 @@ regex==2025.9.18
     # via parsimonious
 requests==2.32.3
     # via hibachi-xyz
+    # via hyperliquid-python-sdk
     # via lighter-sdk
     # via ostium-python-sdk
     # via web3
@@ -202,6 +209,8 @@ urllib3==2.0.7
 web3==7.13.0
     # via ostium-python-sdk
     # via perpdex-trading
+websocket-client==1.8.0
+    # via hyperliquid-python-sdk
 websockets==15.0.1
     # via hibachi-xyz
     # via lighter-sdk
